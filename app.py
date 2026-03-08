@@ -7,16 +7,36 @@ st.set_page_config(page_title="KU AI Assistant", page_icon="🌿")
 api_key = st.secrets.get("GEMINI_API_KEY")
 
 if not api_key:
-    st.error("❌ ไม่พบ API Key ใน Secrets! กรุณาไปที่ Settings > Secrets")
+    st.error("❌ ไม่พบ API Key! กรุณาใส่ใน Secrets")
     st.stop()
 
 # ตั้งค่าโมเดล
 try:
     genai.configure(api_key=api_key)
-    # ใช้โมเดลเวอร์ชันที่เสถียรที่สุด
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    # ลองหาชื่อโมเดลที่ถูกต้องจากระบบ
+    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    
+    # เลือกโมเดล (เรียงลำดับความสำคัญ)
+    target_model = ""
+    for m in ["models/gemini-1.5-flash-latest", "models/gemini-1.5-flash", "models/gemini-pro"]:
+        if m in available_models:
+            target_model = m
+            break
+    
+    if not target_model:
+        # ถ้าไม่เจอตัวที่ต้องการเลย ให้เอาตัวแรกที่ระบบอนุญาต
+        target_model = available_models[0] if available_models else ""
+
+    if not target_model:
+        st.error("❌ ไม่พบโมเดลที่ใช้งานได้สำหรับ API Key นี้")
+        st.stop()
+        
+    model = genai.GenerativeModel(target_model)
+    st.sidebar.success(f"✅ เชื่อมต่อโมเดล: {target_model}")
+
 except Exception as e:
-    st.error(f"❌ การตั้งค่า API ผิดพลาด: {str(e)}")
+    st.error(f"❌ เกิดข้อผิดพลาดในการเชื่อมต่อ: {str(e)}")
     st.stop()
 
 st.title("🌿 KU AI Assistant")
@@ -35,17 +55,8 @@ if prompt := st.chat_input("ถามคำถามที่นี่..."):
 
     with st.chat_message("assistant"):
         try:
-            # ลองส่งคำถาม
             response = model.generate_content(prompt)
-            if response.text:
-                st.markdown(response.text)
-                st.session_state.messages.append({"role": "assistant", "content": response.text})
-            else:
-                st.warning("⚠️ AI ไม่สามารถตอบคำถามนี้ได้ (อาจติดตัวกรองความปลอดภัย)")
+            st.markdown(response.text)
+            st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e:
-            # แสดง Error แบบละเอียด
-            st.error(f"❌ เกิดข้อผิดพลาดจาก Google API: {str(e)}")
-            if "API_KEY_INVALID" in str(e):
-                st.info("💡 คำแนะนำ: API Key ของคุณอาจจะไม่ถูกต้อง ลองสร้างคีย์ใหม่ที่ aistudio.google.com")
-            elif "quota" in str(e).lower():
-                st.info("💡 คำแนะนำ: คุณใช้งานเกินโควตาฟรีของ Gemini แล้ว กรุณารอสักครู่แล้วลองใหม่")
+            st.error(f"❌ ไม่สามารถตอบได้: {str(e)}")
