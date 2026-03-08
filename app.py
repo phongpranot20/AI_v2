@@ -28,7 +28,7 @@ st.markdown("""
         padding-bottom: 20px;
     }
     </style>
-    """, unsafe_allow_ Harris=True)
+    """ unsafe_allow_ Harris=True)
 
 # ดึง API Key (จาก Streamlit Secrets หรือ .env)
 api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
