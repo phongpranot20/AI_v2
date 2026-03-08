@@ -2,21 +2,22 @@ import streamlit as st
 import google.generativeai as genai
 import os
 
-# 1. การตั้งค่าเบื้องต้น
+# 1. ตั้งค่าหน้าจอ
 st.set_page_config(page_title="KU AI Assistant", page_icon="🌿", layout="wide", initial_sidebar_state="expanded")
 
-# 2. CSS ขั้นสูงเพื่อเลียนแบบ React UI เป๊ะๆ
+# 2. CSS ขั้นสูง (ถอดแบบจาก React 1:1)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     
-    /* พื้นฐาน */
+    /* พื้นฐานและขนาดตัวอักษร */
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
         background-color: #f8fafc !important;
+        font-size: 16px;
     }
 
-    /* ซ่อนส่วนประกอบที่ไม่จำเป็นของ Streamlit */
+    /* ซ่อนส่วนประกอบ Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -28,32 +29,35 @@ st.markdown("""
         width: 300px !important;
     }
     
-    .sidebar-content {
-        padding: 1.5rem;
-    }
-    
     .sidebar-logo {
         display: flex;
         align-items: center;
         gap: 12px;
         margin-bottom: 2rem;
+        padding: 0 10px;
     }
     
+    /* Graduation Cap Icon Box */
     .logo-box {
         background-color: #006633;
-        padding: 8px;
+        width: 40px;
+        height: 40px;
         border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         color: white;
         box-shadow: 0 4px 12px rgba(0, 102, 51, 0.2);
     }
 
     .section-title {
-        font-size: 0.75rem;
+        font-size: 0.75rem; /* text-xs */
         font-weight: 600;
         color: #94a3b8;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         margin: 1.5rem 0 1rem 0;
+        padding: 0 10px;
     }
 
     /* Chat Header */
@@ -73,67 +77,90 @@ st.markdown("""
         z-index: 1000;
     }
 
-    /* Chat Bubbles */
+    /* Chat Bubbles Alignment & Styling */
     .stChatMessage {
         background-color: transparent !important;
         padding: 1rem 0 !important;
     }
     
-    /* Model Bubble (White) */
+    /* AI Message (Left) */
+    [data-testid="stChatMessage"]:nth-child(even) {
+        flex-direction: row !important;
+    }
     [data-testid="stChatMessage"]:nth-child(even) .stChatMessageContent {
         background-color: white !important;
         border: 1px solid #e2e8f0 !important;
         border-radius: 0 24px 24px 24px !important;
         color: #1e293b !important;
+        font-size: 0.95rem !important;
+        line-height: 1.6 !important;
         box-shadow: 0 4px 15px rgba(0,0,0,0.05) !important;
+        max-width: 85% !important;
     }
     
-    /* User Bubble (Green Gradient) */
+    /* User Message (Right) */
+    [data-testid="stChatMessage"]:nth-child(odd) {
+        flex-direction: row-reverse !important;
+    }
     [data-testid="stChatMessage"]:nth-child(odd) .stChatMessageContent {
         background: linear-gradient(135deg, #006633 0%, #008542 100%) !important;
         border-radius: 24px 0 24px 24px !important;
         color: white !important;
+        font-size: 0.95rem !important;
+        line-height: 1.6 !important;
         box-shadow: 0 4px 15px rgba(0, 102, 51, 0.2) !important;
+        max-width: 85% !important;
+        text-align: left !important;
     }
 
-    /* Quick Action Cards */
-    .action-card {
-        background: white;
+    /* Quick Action Buttons */
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px;
         border: 1px solid #f1f5f9;
-        border-radius: 16px;
-        padding: 1rem;
-        text-align: center;
-        transition: all 0.3s;
-        cursor: pointer;
+        background-color: white;
+        color: #64748b;
+        font-size: 0.85rem;
+        padding: 0.6rem 1rem;
+        text-align: left;
+        transition: all 0.2s;
+    }
+    .stButton>button:hover {
+        border-color: #006633;
+        color: #006633;
+        background-color: #f0f7f4;
+    }
+    
+    /* Quick Action Grid Buttons */
+    [data-testid="stHorizontalBlock"] .stButton>button {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 8px;
+        text-align: center;
+        font-size: 0.625rem; /* text-[10px] */
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: -0.02em;
+        padding: 1rem 0.5rem;
     }
-    .action-card:hover {
-        border-color: #006633;
-        box-shadow: 0 10px 15px -3px rgba(0, 102, 51, 0.1);
-    }
-    
+
     /* Input Area */
     .stChatInputContainer {
         padding-bottom: 2rem !important;
-        background-color: transparent !important;
     }
     .stChatInput {
         border-radius: 30px !important;
         border: 1px solid #e2e8f0 !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
     }
 
-    /* Mobile Adjustments */
     @media (max-width: 768px) {
         .chat-header { left: 0; }
+        [data-testid="stSidebar"] { width: 0; }
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. ส่วนประกอบ Header (HTML)
+# 3. Header (HTML)
 st.markdown("""
     <div class="chat-header">
         <div style="display: flex; align-items: center; gap: 10px;">
@@ -141,37 +168,38 @@ st.markdown("""
             <span style="background: #f0f7f4; color: #006633; font-size: 0.6rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; border: 1px solid rgba(0,102,51,0.1);">BETA</span>
         </div>
         <div style="text-align: right;">
-            <div style="font-size: 0.65rem; font-weight: 700; color: #006633; letter-spacing: 0.1em;">KASETSART UNIVERSITY</div>
-            <div style="font-size: 0.55rem; color: #94a3b8;">Knowledge of the Land</div>
+            <div style="font-size: 0.7rem; font-weight: 700; color: #006633; letter-spacing: 0.05em;">KASETSART UNIVERSITY</div>
+            <div style="font-size: 0.6rem; color: #94a3b8;">Knowledge of the Land</div>
         </div>
     </div>
     <div style="height: 80px;"></div>
     """, unsafe_allow_html=True)
 
-# 4. Sidebar (เลียนแบบ React Sidebar)
+# 4. Sidebar (พร้อมไอคอนหมวกปริญญา)
 with st.sidebar:
     st.markdown("""
         <div class="sidebar-logo">
-            <div class="logo-box">🌿</div>
+            <div class="logo-box">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+            </div>
             <span style="font-weight: 700; font-size: 1.2rem; color: #1e293b;">KU Assistant</span>
         </div>
         <div class="section-title">คำถามที่พบบ่อย</div>
     """, unsafe_allow_html=True)
     
-    # ปุ่มคำถามที่พบบ่อย (ใช้ st.button แต่แต่ง CSS ให้เหมือน)
-    q1 = st.button("📅  ปฏิทินการศึกษา", key="q1")
-    q2 = st.button("📖  การลงทะเบียน", key="q2")
-    q3 = st.button("📍  แผนที่วิทยาเขต", key="q3")
-    q4 = st.button("💬  รถตะลัย", key="q4")
+    q1 = st.button("📅  ปฏิทินการศึกษา", key="side_q1")
+    q2 = st.button("📖  การลงทะเบียน", key="side_q2")
+    q3 = st.button("📍  แผนที่วิทยาเขต", key="side_q3")
+    q4 = st.button("💬  รถตะลัย", key="side_q4")
     
     st.markdown("""
         <div class="section-title">ลิงก์สำคัญ</div>
-        <div style="display: flex; flex-direction: column; gap: 12px; padding: 0 8px;">
-            <a href="https://www.ku.ac.th" target="_blank" style="text-decoration: none; color: #64748b; font-size: 0.85rem; display: flex; justify-content: space-between;">เว็บไซต์หลัก KU <span>↗</span></a>
-            <a href="https://registrar.ku.ac.th" target="_blank" style="text-decoration: none; color: #64748b; font-size: 0.85rem; display: flex; justify-content: space-between;">สำนักทะเบียน <span>↗</span></a>
-            <a href="https://ocs.ku.ac.th" target="_blank" style="text-decoration: none; color: #64748b; font-size: 0.85rem; display: flex; justify-content: space-between;">สำนักคอมพิวเตอร์ <span>↗</span></a>
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 0 10px;">
+            <a href="https://www.ku.ac.th" target="_blank" style="text-decoration: none; color: #64748b; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;">เว็บไซต์หลัก KU <span style="font-size: 12px;">↗</span></a>
+            <a href="https://registrar.ku.ac.th" target="_blank" style="text-decoration: none; color: #64748b; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;">สำนักทะเบียน <span style="font-size: 12px;">↗</span></a>
+            <a href="https://ocs.ku.ac.th" target="_blank" style="text-decoration: none; color: #64748b; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;">สำนักคอมพิวเตอร์ <span style="font-size: 12px;">↗</span></a>
         </div>
-        <div style="margin-top: 4rem; padding: 1rem; background: #f8fafc; border-radius: 12px; font-size: 0.65rem; color: #94a3b8;">
+        <div style="margin-top: 4rem; padding: 1rem; background: #f8fafc; border-radius: 12px; font-size: 0.65rem; color: #94a3b8; line-height: 1.4;">
             พัฒนาขึ้นเพื่อเป็นตัวช่วยสำหรับนิสิตและบุคลากร มหาวิทยาลัยเกษตรศาสตร์
         </div>
     """, unsafe_allow_html=True)
