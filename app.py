@@ -2,110 +2,212 @@ import streamlit as st
 import google.generativeai as genai
 import os
 
-# 1. ตั้งค่าหน้าจอ (ซ่อน Sidebar และจัดวางกึ่งกลาง)
+# 1. ตั้งค่าหน้าจอแบบ Wide (เต็มจอ) และเปิด Sidebar
 st.set_page_config(
     page_title="KU AI Assistant", 
     page_icon="🌿", 
-    layout="centered", 
-    initial_sidebar_state="collapsed"
+    layout="wide", 
+    initial_sidebar_state="expanded"
 )
 
-# 2. CSS แบบคลีน (เน้นแต่งสีและฟอนต์ ไม่ฝืน Layout)
+# 2. CSS ขั้นสูง (ถอดแบบ React มา 100%)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     
-    /* ฟอนต์หลัก */
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
+        background-color: #f8fafc !important;
     }
 
-    /* ซ่อน Sidebar และปุ่มเมนู */
-    [data-testid="stSidebar"] {display: none;}
-    [data-testid="stHeader"] {display: none;}
-    .stAppDeployButton {display: none;}
+    /* ซ่อนส่วนประกอบมาตรฐาน */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     
-    /* ส่วนหัว (Header) */
-    .custom-header {
+    /* Sidebar Styling */
+    [data-testid="stSidebar"] {
+        background-color: white !important;
+        border-right: 1px solid #e2e8f0 !important;
+        width: 300px !important;
+    }
+    
+    .sidebar-logo {
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        padding: 1rem 0;
-        border-bottom: 1px solid #eee;
+        gap: 12px;
         margin-bottom: 2rem;
+        padding: 1rem;
     }
     
-    /* ปรับแต่งกล่องแชทให้ดูพรีเมียมขึ้น */
-    .stChatMessage {
-        border-radius: 20px !important;
-        margin-bottom: 1rem !important;
-    }
-    
-    /* ปุ่ม Quick Action ให้ดูเหมือน Card */
-    .stButton>button {
-        width: 100%;
-        height: 100px;
-        border-radius: 15px;
-        border: 1px solid #f0f2f6;
-        background-color: white;
-        color: #555;
-        font-size: 0.8rem;
-        font-weight: 600;
+    .logo-box {
+        background-color: #006633;
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 10px;
-        transition: all 0.3s;
-    }
-    .stButton>button:hover {
-        border-color: #006633;
-        color: #006633;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        color: white;
+        box-shadow: 0 4px 12px rgba(0, 102, 51, 0.2);
     }
 
-    /* ปรับสีข้อความในแชท */
-    [data-testid="stChatMessageContent"] p {
-        font-size: 0.95rem;
-        line-height: 1.6;
+    .section-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin: 1.5rem 0 0.5rem 0;
+        padding: 0 1rem;
+    }
+
+    /* Chat Header (Fixed at top) */
+    .chat-header {
+        position: fixed;
+        top: 0;
+        right: 0;
+        left: 300px;
+        height: 70px;
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 2rem;
+        border-bottom: 1px solid rgba(0, 102, 51, 0.1);
+        z-index: 1000;
+    }
+
+    /* Chat Bubbles Alignment */
+    .stChatMessage {
+        background-color: transparent !important;
+        padding: 1rem 0 !important;
+        max-width: 1000px;
+        margin: 0 auto !important;
+    }
+    
+    /* AI Message (Left) */
+    [data-testid="stChatMessage"]:nth-child(even) {
+        flex-direction: row !important;
+    }
+    [data-testid="stChatMessage"]:nth-child(even) .stChatMessageContent {
+        background-color: white !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 0 24px 24px 24px !important;
+        color: #1e293b !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05) !important;
+    }
+    
+    /* User Message (Right) */
+    [data-testid="stChatMessage"]:nth-child(odd) {
+        flex-direction: row-reverse !important;
+    }
+    [data-testid="stChatMessage"]:nth-child(odd) .stChatMessageContent {
+        background: linear-gradient(135deg, #006633 0%, #008542 100%) !important;
+        border-radius: 24px 0 24px 24px !important;
+        color: white !important;
+        box-shadow: 0 4px 15px rgba(0, 102, 51, 0.2) !important;
+        text-align: left !important;
+    }
+
+    /* Sidebar Buttons */
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid transparent;
+        background-color: transparent;
+        color: #64748b;
+        text-align: left;
+        padding: 0.6rem 1rem;
+        transition: all 0.2s;
+    }
+    .stButton>button:hover {
+        background-color: #f0f7f4;
+        color: #006633;
+    }
+    
+    /* Quick Action Grid (Bottom) */
+    .action-grid {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+
+    /* Input Area */
+    .stChatInputContainer {
+        padding-bottom: 2rem !important;
+        max-width: 1000px;
+        margin: 0 auto !important;
+    }
+
+    @media (max-width: 1024px) {
+        .chat-header { left: 0; }
+        [data-testid="stSidebar"] { display: none; }
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. แสดง Header แบบเรียบหรู
+# 3. Header (Fixed)
 st.markdown("""
-    <div class="custom-header">
+    <div class="chat-header">
         <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="background: #006633; color: white; padding: 5px 8px; border-radius: 8px; font-weight: bold;">🌿</div>
-            <span style="font-weight: 700; font-size: 1.2rem;">KU AI Assistant</span>
-            <span style="background: #f0f7f4; color: #006633; font-size: 0.6rem; font-weight: 700; padding: 2px 8px; border-radius: 10px;">BETA</span>
+            <span style="font-weight: 700; color: #1e293b; font-size: 1.1rem;">KU AI Assistant</span>
+            <span style="background: #f0f7f4; color: #006633; font-size: 0.6rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; border: 1px solid rgba(0,102,51,0.1);">BETA</span>
         </div>
         <div style="text-align: right;">
-            <div style="font-size: 0.7rem; font-weight: 700; color: #006633;">KASETSART UNIVERSITY</div>
+            <div style="font-size: 0.7rem; font-weight: 700; color: #006633; letter-spacing: 0.05em;">KASETSART UNIVERSITY</div>
             <div style="font-size: 0.6rem; color: #94a3b8;">Knowledge of the Land</div>
         </div>
     </div>
+    <div style="height: 80px;"></div>
     """, unsafe_allow_html=True)
 
-# 4. การทำงานของ AI
+# 4. Sidebar (เลียนแบบ React)
+with st.sidebar:
+    st.markdown("""
+        <div class="sidebar-logo">
+            <div class="logo-box">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+            </div>
+            <span style="font-weight: 700; font-size: 1.2rem; color: #1e293b;">KU Assistant</span>
+        </div>
+        <div class="section-title">คำถามที่พบบ่อย</div>
+    """, unsafe_allow_html=True)
+    
+    sq1 = st.button("📅  ปฏิทินการศึกษา", key="side_1")
+    sq2 = st.button("📖  การลงทะเบียน", key="side_2")
+    sq3 = st.button("📍  แผนที่วิทยาเขต", key="side_3")
+    sq4 = st.button("💬  รถตะลัย", key="side_4")
+    
+    st.markdown("""
+        <div class="section-title">ลิงก์สำคัญ</div>
+        <div style="display: flex; flex-direction: column; gap: 10px; padding: 0 1rem;">
+            <a href="https://www.ku.ac.th" target="_blank" style="text-decoration: none; color: #64748b; font-size: 0.85rem; display: flex; justify-content: space-between;">เว็บไซต์หลัก KU <span>↗</span></a>
+            <a href="https://registrar.ku.ac.th" target="_blank" style="text-decoration: none; color: #64748b; font-size: 0.85rem; display: flex; justify-content: space-between;">สำนักทะเบียน <span>↗</span></a>
+            <a href="https://ocs.ku.ac.th" target="_blank" style="text-decoration: none; color: #64748b; font-size: 0.85rem; display: flex; justify-content: space-between;">สำนักคอมพิวเตอร์ <span>↗</span></a>
+        </div>
+    """, unsafe_allow_html=True)
+
+# 5. การทำงานของ AI
 api_key = st.secrets.get("GEMINI_API_KEY")
 if not api_key:
     st.error("กรุณาตั้งค่า GEMINI_API_KEY ใน Secrets")
     st.stop()
 
 genai.configure(api_key=api_key)
-
 SYSTEM_INSTRUCTION = "คุณคือ AI Chatbot ของมหาวิทยาลัยเกษตรศาสตร์ ตอบคำถามด้วยภาษาไทยที่สุภาพและเป็นกันเอง ใช้ Google Search ค้นหาข้อมูลล่าสุดจากเว็บ ku.ac.th เสมอ"
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "สวัสดีครับ! ผมคือ **KU AI Assistant** ยินดีที่ได้รู้จักครับ 🌿\n\nผมพร้อมช่วยเหลือคุณในทุกเรื่องเกี่ยวกับมหาวิทยาลัยเกษตรศาสตร์ มีอะไรให้ผมช่วยไหมครับ?"}]
+    st.session_state.messages = [{"role": "assistant", "content": "สวัสดีครับ! ผมคือ **KU AI Assistant** ยินดีที่ได้รู้จักครับ 🌿\n\nผมพร้อมช่วยเหลือคุณในทุกเรื่องเกี่ยวกับมหาวิทยาลัยเกษตรศาสตร์ ไม่ว่าจะเป็นเรื่องการเรียน กิจกรรม หรือการใช้ชีวิตในรั้วนนทรี มีอะไรให้ผมช่วยไหมครับ?"}]
     st.session_state.chat = genai.GenerativeModel(
         model_name="gemini-1.5-flash",
         system_instruction=SYSTEM_INSTRUCTION,
         tools=[{"google_search_retrieval": {}}]
     ).start_chat(history=[])
 
-# แสดงแชท (ฝั่งเดียวกันตามมาตรฐาน Streamlit)
+# แสดงแชท
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -115,25 +217,29 @@ def send_msg(text):
     st.session_state.messages.append({"role": "user", "content": text})
     with st.chat_message("user"):
         st.markdown(text)
-    
     with st.chat_message("assistant"):
         response = st.session_state.chat.send_message(text)
         st.markdown(response.text)
         st.session_state.messages.append({"role": "assistant", "content": response.text})
 
-# 5. Quick Action Cards (แสดงเฉพาะตอนเริ่มแชท)
+# 6. Quick Action Cards (แสดงเฉพาะตอนเริ่มแชท)
 if len(st.session_state.messages) <= 1:
-    st.write("") # เว้นระยะ
     cols = st.columns(4)
     with cols[0]:
-        if st.button("📅\nปฏิทินการศึกษา"): send_msg("ขอปฏิทินการศึกษาปีล่าสุด")
+        if st.button("📅\nปฏิทินการศึกษา", key="b1"): send_msg("ขอปฏิทินการศึกษาปีล่าสุด")
     with cols[1]:
-        if st.button("📖\nการลงทะเบียน"): send_msg("ขั้นตอนการลงทะเบียนเรียน")
+        if st.button("📖\nการลงทะเบียน", key="b2"): send_msg("ขั้นตอนการลงทะเบียนเรียน")
     with cols[2]:
-        if st.button("📍\nแผนที่วิทยาเขต"): send_msg("ขอแผนที่ ม.เกษตร บางเขน")
+        if st.button("📍\nแผนที่วิทยาเขต", key="b3"): send_msg("ขอแผนที่ ม.เกษตร บางเขน")
     with cols[3]:
-        if st.button("💬\nรถตะลัย"): send_msg("ตารางรถตะลัย")
+        if st.button("💬\nรถตะลัย", key="b4"): send_msg("ตารางรถตะลัย")
 
-# 6. ช่องรับข้อความ
+# 7. ช่องรับข้อความ
 if prompt := st.chat_input("พิมพ์คำถามของคุณที่นี่..."):
     send_msg(prompt)
+
+# ปุ่ม Sidebar
+if sq1: send_msg("ขอปฏิทินการศึกษาปีล่าสุด")
+if sq2: send_msg("ขั้นตอนการลงทะเบียนเรียน")
+if sq3: send_msg("ขอแผนที่ ม.เกษตร บางเขน")
+if sq4: send_msg("ตารางรถตะลัย")
